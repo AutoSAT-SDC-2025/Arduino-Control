@@ -88,8 +88,8 @@ void loop() {
     SBUS_Enable = (data.ch[4] == 1500);
 
 
-    StepperPosition = (data.ch[0] - 991.0) / 819.0 * STEPPER_RANGE;
-
+    SBUS_Steering_Angle = (data.ch[0] - 991.0) / 819.0 * STEPPER_RANGE;
+    SBUS_Speed = (data.ch[0] - 991.0) / 819.0 * STEPPER_RANGE;
   }
 
   CANFrame frame;
@@ -98,7 +98,6 @@ void loop() {
       case ID::CONTROLE_COMAND:
         uint8_t data_out[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         frame.getData(data_out, sizeof(data_out));
-          
         CAN_Speed = (double)((int16_t)((data_out[0] << 8) | data_out[1])) / 1000.0;
         CAN_Steering_Angle = (double)((int16_t)((data_out[6] << 8) | data_out[7])) / 1000.0;
 
