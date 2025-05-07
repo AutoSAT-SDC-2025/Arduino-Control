@@ -128,10 +128,12 @@ void loop() {
   else if (CAN_Enable){
 
   }
+  else {
+
+  }
 
 
 
   stepper.run();
 
 }
-// test
