@@ -97,8 +97,8 @@ void loop() {
     SBUS_Enable = (data.ch[4] == 1500);
 
 
-    SBUS_Steering_Angle = (data.ch[0] - 991.0) / 819.0 * STEPPER_RANGE;
-    SBUS_Speed = (data.ch[0] - 991.0) / 819.0 * STEPPER_RANGE;
+    SBUS_Steering_Angle = (data.ch[0] - 991.0) / 819.0 * 0.576;
+    SBUS_Speed = (data.ch[0] - 991.0) / 819.0 * 1.5;
   }
 
   CANFrame frame_in;
@@ -143,8 +143,8 @@ void loop() {
     Set_Speed = 0;
   }
 
-  Actual_Steering_Angle = stepper.currentPosition() / 5000;
-  stepper.moveTo(Set_Steering_Angle*5000);
+  Actual_Steering_Angle = stepper.currentPosition() / STEPPER_RANGE;
+  stepper.moveTo(Set_Steering_Angle*STEPPER_RANGE);
   stepper.run();
 
   unsigned long currentMillis = millis();
