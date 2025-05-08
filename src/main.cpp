@@ -130,6 +130,23 @@ void loop() {
 
   }
 
+  if (SBUS_Enable){
+    Set_Steering_Angle = SBUS_Steering_Angle;
+    Set_Speed = SBUS_Speed;
+  }
+  else if (CAN_Enable){
+    Set_Steering_Angle = CAN_Steering_Angle;
+    Set_Speed = CAN_Speed;
+  }
+  else {
+    Set_Steering_Angle = 0;
+    Set_Speed = 0;
+  }
+
+  Actual_Steering_Angle = stepper.currentPosition() / 5000;
+  stepper.moveTo(Set_Steering_Angle*5000);
+  stepper.run();
+
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
@@ -149,28 +166,4 @@ void loop() {
     CAN.write(frame_out);
     frame_out.print("CAN TX");
   }
-
-  
-
-  if (SBUS_Enable){
-    Set_Steering_Angle = SBUS_Steering_Angle;
-    Set_Speed = SBUS_Speed;
-  }
-  else if (CAN_Enable){
-    Set_Steering_Angle = CAN_Steering_Angle;
-    Set_Speed = CAN_Speed;
-  }
-  else {
-    Set_Steering_Angle = 0;
-    Set_Speed = 0;
-  }
-
-
-
-
-  stepper.moveTo(Set_Steering_Angle*5000);
-  stepper.run();
-
-
-
 }
