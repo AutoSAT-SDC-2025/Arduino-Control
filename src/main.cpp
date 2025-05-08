@@ -1,13 +1,3 @@
-/*
-  CAN Receive Example
-
-  This will setup the CAN controller(MCP2515) to receive CAN frames.
-  Received frames will be printed to the Serial port.
-
-  MIT License
-  https://github.com/codeljo/AA_MCP2515
-*/
-
 #include "sbus.h"
 #include "AA_MCP2515.h"
 #include <AccelStepper.h>
@@ -29,6 +19,15 @@ bfs::SbusData data;
 
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 
+
+/*
+MCP2515 CAN Controller pin out
+SPI CS      (SS)    pin 53
+SPI Clock   (SCK)   pin 52
+SPI MOSI    (SI)    pin 51
+SPI MISO    (SO)    pin 50
+Interrupt   (INT)   pin  2
+*/
 const CANBitrate::Config CAN_BITRATE = CANBitrate::Config_16MHz_500kbps;
 const uint8_t CAN_PIN_CS = 53;
 const int8_t CAN_PIN_INT = 2;
