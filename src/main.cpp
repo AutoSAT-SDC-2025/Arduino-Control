@@ -24,6 +24,9 @@ bfs::SbusData data;
 #define DIR_PIN 22
 #define ENDSTOP_PIN 24
 
+#define ENDSTOP_PIN_BRAKE_MIN 25
+#define ENDSTOP_PIN_BRAKE_MAX 26
+
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 
 const CANBitrate::Config CAN_BITRATE = CANBitrate::Config_16MHz_500kbps;
@@ -64,13 +67,16 @@ unsigned long previousMillis = 0;
 
 
 void setup() {
+  pinMode(ENDSTOP_PIN_BRAKE_MIN, INPUT_PULLUP);  // set up end switch for braking min
+  pinMode(ENDSTOP_PIN_BRAKE_MAX, INPUT_PULLUP);  // set up end switch for braking max
+
   /* Serial to display data */
   Serial.begin(115200);
   while (!Serial) {}
   /* Begin the SBUS communication */
   sbus_rx.Begin();
 
-  pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // set up end switch
+  pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // set up end switch for steering
   stepper.setMaxSpeed(3200000);
   stepper.setAcceleration(600000);
 
