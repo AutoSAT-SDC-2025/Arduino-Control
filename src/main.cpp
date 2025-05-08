@@ -41,23 +41,23 @@ enum ID {
   MOVEMENT_CONTROL_FEEDBACK_COMMAND = 0x221
 };
 
-bool CAN_Enable = false;
-bool SBUS_Enable = false;
+bool CAN_Enable = false; // Enable steering over CAN bus
+bool SBUS_Enable = false; // Enable steering over SBUS
 
-double CAN_Steering_Angle = 0;
-double CAN_Speed = 0;
+double CAN_Steering_Angle = 0; // CAN bus steering Angle in rad
+double CAN_Speed = 0; // CAN bus speed in m/s
 
-double SBUS_Steering_Angle = 0;
-double SBUS_Speed = 0;
+double SBUS_Steering_Angle = 0; // s.bus steering angle in rad
+double SBUS_Speed = 0; // s.bus speed in m/s
 
-double Set_Steering_Angle = 0;
-double Set_Speed = 0;
+double Set_Steering_Angle = 0; // the set steering angle in rad
+double Set_Speed = 0; // the set speed in m/s
 
-double Actual_Steering_Angle = 0;
-double Actual_speed = 0;
+double Actual_Steering_Angle = 0; // the achtual steering angle in rad
+double Actual_speed = 0; // the actual speed in m/s
 
-double STEPPER_RANGE = 1000;
-double END_SWITCH_OFSET = -1000;
+double STEPS_PER_RAD = 1000; // the amount of steps the stepper needs for 1 rad of steering agle
+double END_SWITCH_OFSET = -1000; // the amount of steps from the end switch to the zero point
 
 const long interval = 20;  // interval at which to blink (milliseconds)
 unsigned long previousMillis = 0;
@@ -70,8 +70,8 @@ void setup() {
   /* Begin the SBUS communication */
   sbus_rx.Begin();
 
-  pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // Pull-up resistor
-  stepper.setMaxSpeed(3200000);            // adjust as needed
+  pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // set up end switch
+  stepper.setMaxSpeed(3200000);
   stepper.setAcceleration(600000);
 
   // Move toward the switch slowly until it's hit
@@ -83,6 +83,7 @@ void setup() {
   // Stop and set current position as ofset from zero
   stepper.setCurrentPosition(END_SWITCH_OFSET);
 
+  // test contection to CAN bus controler
   while(CAN.begin(CANController::Mode::Normal) != CANController::OK) {
     Serial.println("CAN begin FAIL - delaying for 1 second");
     delay(1000);
@@ -143,8 +144,8 @@ void loop() {
     Set_Speed = 0;
   }
 
-  Actual_Steering_Angle = stepper.currentPosition() / STEPPER_RANGE;
-  stepper.moveTo(Set_Steering_Angle*STEPPER_RANGE);
+  Actual_Steering_Angle = stepper.currentPosition() / STEPS_PER_RAD;
+  stepper.moveTo(Set_Steering_Angle*STEPS_PER_RAD);
   stepper.run();
 
   unsigned long currentMillis = millis();
