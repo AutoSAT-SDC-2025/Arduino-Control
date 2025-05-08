@@ -37,7 +37,8 @@ enum ID {
   CONTROLE_COMAND = 0x111,
   CONTROLE_MODE_SETTING_COMAND = 0x421,
   STATUS_SETTING_COMMAND = 0x441,
-  PARKING_CONTROLE_COMMAND = 0x131
+  PARKING_CONTROLE_COMMAND = 0x131,
+  MOVEMENT_CONTROL_FEEDBACK_COMMAND = 0x221
 };
 
 bool CAN_Enable = false;
@@ -49,9 +50,17 @@ double CAN_Speed = 0;
 double SBUS_Steering_Angle = 0;
 double SBUS_Speed = 0;
 
+double Set_Steering_Angle = 0;
+double Set_Speed = 0;
+
+double Actual_Steering_Angle = 0;
+double Actual_speed = 0;
+
 double STEPPER_RANGE = 1000;
 double END_SWITCH_OFSET = -1000;
 
+const long interval = 20;  // interval at which to blink (milliseconds)
+unsigned long previousMillis = 0;
 
 
 void setup() {
@@ -92,22 +101,22 @@ void loop() {
     SBUS_Speed = (data.ch[0] - 991.0) / 819.0 * STEPPER_RANGE;
   }
 
-  CANFrame frame;
-  if (CAN.read(frame) == CANController::IOResult::OK) {
-    switch (frame.getId()) {
+  CANFrame frame_in;
+  if (CAN.read(frame_in) == CANController::IOResult::OK) {
+    switch (frame_in.getId()) {
       case ID::CONTROLE_COMAND:
-        uint8_t data_out[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-        frame.getData(data_out, sizeof(data_out));
-        CAN_Speed = (double)((int16_t)((data_out[0] << 8) | data_out[1])) / 1000.0;
-        CAN_Steering_Angle = (double)((int16_t)((data_out[6] << 8) | data_out[7])) / 1000.0;
+        uint8_t data_in[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        frame_in.getData(data_in, sizeof(data_in));
 
-        Serial.print("Steering angle = ");
+        CAN_Speed = (double)((int16_t)((data_in[0] << 8) | data_in[1])) / 1000.0;
+        CAN_Steering_Angle = (double)((int16_t)((data_in[6] << 8) | data_in[7])) / 1000.0;
+
+        Serial.print("Rteering angle = ");
         Serial.print(CAN_Steering_Angle, 3);
         Serial.print("Rad   Speed = ");
         Serial.print(CAN_Speed, 3);
         Serial.println("m/s");
 
-        stepper.moveTo(CAN_Steering_Angle*5000);
         // code block
         break;
       case ID::CONTROLE_MODE_SETTING_COMAND:
@@ -120,20 +129,48 @@ void loop() {
 
 
   }
+
+  unsigned long currentMillis = millis();
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
+
+    uint8_t data_out[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+    int16_t speed_int = (int16_t)(Actual_speed * 1000.0);
+    int16_t angle_int = (int16_t)(Actual_Steering_Angle * 1000.0);
+
+    data_out[0] = (uint8_t)((speed_int >> 8) & 0xFF); // High byte of speed
+    data_out[1] = (uint8_t)(speed_int & 0xFF);        // Low byte of speed
+
+    data_out[6] = (uint8_t)((angle_int >> 8) & 0xFF); // High byte of steering angle
+    data_out[7] = (uint8_t)(angle_int & 0xFF);        // Low byte of steering angle
+
+    CANFrame frame_out(ID::MOVEMENT_CONTROL_FEEDBACK_COMMAND, data_out, sizeof(data_out));
+    CAN.write(frame_out);
+    frame_out.print("CAN TX");
+  }
+
   
 
   if (SBUS_Enable){
-    
+    Set_Steering_Angle = SBUS_Steering_Angle;
+    Set_Speed = SBUS_Speed;
   }
   else if (CAN_Enable){
-
+    Set_Steering_Angle = CAN_Steering_Angle;
+    Set_Speed = CAN_Speed;
   }
   else {
-
+    Set_Steering_Angle = 0;
+    Set_Speed = 0;
   }
 
 
 
+
+  stepper.moveTo(Set_Steering_Angle*5000);
   stepper.run();
+
+
 
 }
