@@ -1,5 +1,6 @@
 #include "sbus.h"
 #include "AA_MCP2515.h"
+#include <VescUart.h>
 #include <AccelStepper.h>
 #include <Arduino.h>
 
@@ -16,6 +17,8 @@ bfs::SbusData data;
 
 #define ENDSTOP_PIN_BRAKE_MIN 25
 #define ENDSTOP_PIN_BRAKE_MAX 26
+
+VescUart UART;
 
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 
@@ -73,6 +76,9 @@ void setup() {
   Serial.begin(115200);
   while (!Serial) {}
   /* Begin the SBUS communication */
+
+  UART.setSerialPort(&Serial2);
+
   sbus_rx.Begin();
 
   pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // set up end switch for steering
