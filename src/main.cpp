@@ -9,7 +9,7 @@ bfs::SbusRx sbus_rx(&Serial1, false);
 /* SBUS object, writing SBUS */
 bfs::SbusTx sbus_tx(&Serial1, false);
 /* SBUS data */
-bfs::SbusData data;
+bfs::SbusData Sbus_Rx_Data;
 
 #define STEP_PIN 23
 #define DIR_PIN 22
@@ -59,13 +59,19 @@ double Set_Steering_Angle = 0; // the set steering angle in rad
 double Set_Speed = 0; // the set speed in m/s
 
 double Actual_Steering_Angle = 0; // the achtual steering angle in rad
-double Actual_speed = 0; // the actual speed in m/s
+double Actual_Speed = 0; // the actual speed in m/s
+
+double Battery_Voltage = 0;
+double Curent_Draw_Drive_Motor = 0;
 
 double STEPS_PER_RAD = 1000; // the amount of steps the stepper needs for 1 rad of steering agle
 double END_SWITCH_OFSET = -1000; // the amount of steps from the end switch to the zero point
+double MPS_TO_RPM_FACTOR = 1000; // Conversion factor for calculating the M/s to RPM
 
 const long interval = 20;  // interval at which to blink (milliseconds)
 unsigned long previousMillis = 0;
+
+
 
 
 void setup() {
@@ -74,11 +80,13 @@ void setup() {
 
   /* Serial to display data */
   Serial.begin(115200);
+  Serial2.begin(115200);
+
   while (!Serial) {}
-  /* Begin the SBUS communication */
 
   UART.setSerialPort(&Serial2);
 
+  /* Begin the SBUS communication */
   sbus_rx.Begin();
 
   pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // set up end switch for steering
@@ -104,13 +112,13 @@ void setup() {
 
 void loop() {
   if (sbus_rx.Read()) {
-    data = sbus_rx.data();
-    CAN_Enable = (data.ch[4] < 1000);
-    SBUS_Enable = (data.ch[4] == 1500);
+    Sbus_Rx_Data = sbus_rx.data();
+    CAN_Enable = (Sbus_Rx_Data.ch[4] < 1000);
+    SBUS_Enable = (Sbus_Rx_Data.ch[4] == 1500);
 
 
-    SBUS_Steering_Angle = (data.ch[0] - 991.0) / 819.0 * 0.576;
-    SBUS_Speed = (data.ch[0] - 991.0) / 819.0 * 1.5;
+    SBUS_Steering_Angle = (Sbus_Rx_Data.ch[0] - 991.0) / 819.0 * 0.576;
+    SBUS_Speed = (Sbus_Rx_Data.ch[1] - 991.0) / 819.0 * 1.5;
   }
 
   CANFrame frame_in;
@@ -139,7 +147,6 @@ void loop() {
         break;
     }
 
-
   }
 
   if (SBUS_Enable){
@@ -159,7 +166,12 @@ void loop() {
   stepper.moveTo(Set_Steering_Angle*STEPS_PER_RAD);
   stepper.run();
 
-  // test
+  if ( UART.getVescValues() ) {
+    Actual_Speed = UART.data.rpm / MPS_TO_RPM_FACTOR;
+    Battery_Voltage = UART.data.inpVoltage;
+    Curent_Draw_Drive_Motor = UART.data.ampHours;
+  }
+  UART.setRPM(Set_Speed*MPS_TO_RPM_FACTOR);
 
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
@@ -167,7 +179,7 @@ void loop() {
 
     uint8_t data_out[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
-    int16_t speed_int = (int16_t)(Actual_speed * 1000.0);
+    int16_t speed_int = (int16_t)(Actual_Speed * 1000.0);
     int16_t angle_int = (int16_t)(Actual_Steering_Angle * 1000.0);
 
     data_out[0] = (uint8_t)((speed_int >> 8) & 0xFF); // High byte of speed
