@@ -13,12 +13,12 @@ bfs::SbusTx sbus_tx(&Serial1, false);
 /* SBUS data */
 bfs::SbusData Sbus_Rx_Data;
 
-#define STEP_PIN 23
-#define DIR_PIN 22
-#define ENDSTOP_PIN 24
+#define STEP_PIN 25
+#define DIR_PIN 27
+#define ENDSTOP_PIN 23
 
-#define ENDSTOP_BRAKE_MIN_PIN 22
-#define ENDSTOP_BRAKE_MAX_PIN 24
+#define ENDSTOP_BRAKE_MIN_PIN 24
+#define ENDSTOP_BRAKE_MAX_PIN 22
 #define REVERSE_PIN 26
 #define PWM_PIN 3
 
@@ -107,11 +107,11 @@ void setup() {
   sbus_rx.Begin();
 
   pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // set up end switch for steering
-  stepper.setMaxSpeed(3200000);
-  stepper.setAcceleration(600000);
+  stepper.setMaxSpeed(6200000);            // adjust as needed
+  stepper.setAcceleration(1200000);
 
   // Move toward the switch slowly until it's hit
-  stepper.setSpeed(-100); // Move in reverse
+  stepper.setSpeed(-300); // Move in reverse
   while (digitalRead(ENDSTOP_PIN) == LOW) {
     stepper.runSpeed();  // Move until switch is hit
   }
@@ -137,9 +137,9 @@ void loop() {
     SBUS_Enable = (Sbus_Rx_Data.ch[4] == 992);
     SBUS_EmergencyState = (Sbus_Rx_Data.ch[5] < 990);
 
-    SBUS_Speed_Mode = (Sbus_Rx_Data.ch[6] - 10.0) / 819.0;
+    SBUS_Speed_Mode = (Sbus_Rx_Data.ch[6]) / 400.0;
 
-    SBUS_Steering_Angle = (Sbus_Rx_Data.ch[0] - 992.0) / 819.0 * 0.576;
+    SBUS_Steering_Angle = (Sbus_Rx_Data.ch[3] - 992.0) / 819.0 * 0.576;
     SBUS_Speed = (Sbus_Rx_Data.ch[1] - 992.0) / 819.0 * 1.5;
   }
 
@@ -171,7 +171,7 @@ void loop() {
 
   }
 
-  bool raw = !digitalRead(EMERGENCY_STOP_PIN);
+  bool raw = digitalRead(EMERGENCY_STOP_PIN);
 
   if (raw != lastEmergencyReading) {
     lastDebounceTime = millis();                 // reset timer on any edge
@@ -222,6 +222,16 @@ void loop() {
   stepper.moveTo(Set_Steering_Angle*STEPS_PER_RAD);
   stepper.run();
 
+  Serial.print(SBUS_Speed);
+  Serial.print(" - ");
+  Serial.print(Set_Speed);
+  Serial.print(" - ");
+  Serial.print(MPS_TO_RPM_FACTOR);
+  Serial.print(" - ");
+  Serial.println((1000 + (Set_Speed * MPS_TO_RPM_FACTOR * SBUS_Speed_Mode)));
+
+
+
   esc.writeMicroseconds(1000 + (Set_Speed * MPS_TO_RPM_FACTOR * SBUS_Speed_Mode));
 
   /* USE IF SPEED CONTROLER CONECTED VIA UART/SERIAL
@@ -234,7 +244,7 @@ void loop() {
   */
 
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval) {
+  if (currentMillis - previousMillis >= interval && false) {
     previousMillis = currentMillis;
 
     uint8_t CAN_Bus_Data_Out[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
