@@ -3,6 +3,8 @@
 #include <VescUart.h>
 #include <AccelStepper.h>
 #include <Arduino.h>
+#include <Servo.h>
+
 
 /* SBUS object, reading SBUS */
 bfs::SbusRx sbus_rx(&Serial1, false);
@@ -26,6 +28,7 @@ VescUart UART;
 
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 
+Servo esc;  // create servo object to control the ESC
 
 /*
 MCP2515 CAN Controller pin out
@@ -50,18 +53,25 @@ enum ID {
   MOVEMENT_CONTROL_FEEDBACK_COMMAND = 0x221
 };
 
+const unsigned long DEBOUNCE_DELAY = 50;      // ms
+bool  EmergencyState        = HIGH;           // debounced level (HIGH = released)
+bool  lastEmergencyReading  = HIGH;           // last raw read
+unsigned long lastDebounceTime = 0;           // timer
+
 bool CAN_Enable = false; // Enable steering over CAN bus
 bool SBUS_Enable = false; // Enable steering over SBUS
 
 double CAN_Steering_Angle = 0; // CAN bus steering Angle in rad
 double CAN_Speed = 0; // CAN bus speed in m/s
 
+double SBUS_Speed_Mode = 0;
 double SBUS_Steering_Angle = 0; // s.bus steering angle in rad
 double SBUS_Speed = 0; // s.bus speed in m/s
-double SBUS_Brake = true;
+bool SBUS_EmergencyState = true;
 
 double Set_Steering_Angle = 0; // the set steering angle in rad
 double Set_Speed = 0; // the set speed in m/s
+bool Set_Brake = true;
 
 double Actual_Steering_Angle = 0; // the achtual steering angle in rad
 double Actual_Speed = 0; // the actual speed in m/s
@@ -69,16 +79,12 @@ double Actual_Speed = 0; // the actual speed in m/s
 double Battery_Voltage = 0;
 double Curent_Draw_Drive_Motor = 0;
 
-double STEPS_PER_RAD = 1000; // the amount of steps the stepper needs for 1 rad of steering agle
-double END_SWITCH_OFSET = -1000; // the amount of steps from the end switch to the zero point
-double MPS_TO_RPM_FACTOR = 1000; // Conversion factor for calculating the M/s to RPM
+double STEPS_PER_RAD = 1200 / 0.576; // the amount of steps the stepper needs for 1 rad of steering agle
+double END_SWITCH_OFSET = -1200; // the amount of steps from the end switch to the zero point
+double MPS_TO_RPM_FACTOR = 54.6; // Conversion factor for calculating the M/s to RPM
 
 const long interval = 20;  // interval at which to blink (milliseconds)
 unsigned long previousMillis = 0;
-
-bool brake = true;
-
-
 
 void setup() {
   pinMode(ENDSTOP_BRAKE_MIN_PIN, INPUT_PULLUP);  // set up end switch for braking min
@@ -119,6 +125,9 @@ void setup() {
     delay(1000);
   }
   Serial.println("CAN begin OK");
+
+  esc.attach(4);  // ESC signal wire connected to pin 4
+  esc.writeMicroseconds(1000);  // send low throttle to arm ESC
 }
 
 void loop() {
@@ -126,7 +135,9 @@ void loop() {
     Sbus_Rx_Data = sbus_rx.data();
     CAN_Enable = (Sbus_Rx_Data.ch[4] > 1000);
     SBUS_Enable = (Sbus_Rx_Data.ch[4] == 992);
-    SBUS_Brake = (Sbus_Rx_Data.ch[5] < 990);
+    SBUS_EmergencyState = (Sbus_Rx_Data.ch[5] < 990);
+
+    SBUS_Speed_Mode = (Sbus_Rx_Data.ch[6] - 10.0) / 819.0;
 
     SBUS_Steering_Angle = (Sbus_Rx_Data.ch[0] - 992.0) / 819.0 * 0.576;
     SBUS_Speed = (Sbus_Rx_Data.ch[1] - 992.0) / 819.0 * 1.5;
@@ -160,31 +171,46 @@ void loop() {
 
   }
 
-  if (digitalRead(EMERGENCY_STOP_PIN) == HIGH){
-    Set_Steering_Angle = 0;
+  bool raw = !digitalRead(EMERGENCY_STOP_PIN);
+
+  if (raw != lastEmergencyReading) {
+    lastDebounceTime = millis();                 // reset timer on any edge
+  }
+
+  if ((millis() - lastDebounceTime) > DEBOUNCE_DELAY) {
+    // reading stayed stable long enough → accept it
+    if (raw != EmergencyState) {
+      EmergencyState = raw;
+    }
+  }
+  lastEmergencyReading = raw;
+
+  if (EmergencyState || SBUS_EmergencyState){
+    Set_Steering_Angle = SBUS_Steering_Angle;
     Set_Speed = 0;
-    brake = true;
+    Set_Brake = true;
   }
   else if (SBUS_Enable){
     Set_Steering_Angle = SBUS_Steering_Angle;
     Set_Speed = SBUS_Speed;
-    brake = SBUS_Brake;
+    Set_Brake = false;
   }
   else if (CAN_Enable){
     Set_Steering_Angle = CAN_Steering_Angle;
     Set_Speed = CAN_Speed;
+    Set_Brake = false;
   }
   else {
     Set_Steering_Angle = 0;
     Set_Speed = 0;
-    brake = true;
+    Set_Brake = true;
   }
 
-  if (digitalRead(ENDSTOP_BRAKE_MIN_PIN) == LOW && brake) {
+  if (digitalRead(ENDSTOP_BRAKE_MIN_PIN) == LOW && Set_Brake) {
     digitalWrite(REVERSE_PIN, HIGH);
     analogWrite(PWM_PIN, 230);
   }
-  else if (digitalRead(ENDSTOP_BRAKE_MAX_PIN) == LOW && !brake) {
+  else if (digitalRead(ENDSTOP_BRAKE_MAX_PIN) == LOW && !Set_Brake) {
     digitalWrite(REVERSE_PIN, LOW);
     analogWrite(PWM_PIN, 230);
   }
@@ -196,12 +222,16 @@ void loop() {
   stepper.moveTo(Set_Steering_Angle*STEPS_PER_RAD);
   stepper.run();
 
+  esc.writeMicroseconds(1000 + (Set_Speed * MPS_TO_RPM_FACTOR * SBUS_Speed_Mode));
+
+  /* USE IF SPEED CONTROLER CONECTED VIA UART/SERIAL
   if ( UART.getVescValues() ) {
     Actual_Speed = UART.data.rpm / MPS_TO_RPM_FACTOR;
     Battery_Voltage = UART.data.inpVoltage;
     Curent_Draw_Drive_Motor = UART.data.ampHours;
   }
   UART.setRPM(Set_Speed*MPS_TO_RPM_FACTOR);
+  */
 
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
