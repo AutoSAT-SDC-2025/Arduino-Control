@@ -79,8 +79,8 @@ double Actual_Speed = 0; // the actual speed in m/s
 double Battery_Voltage = 0;
 double Curent_Draw_Drive_Motor = 0;
 
-double STEPS_PER_RAD = 1200 / 0.576; // the amount of steps the stepper needs for 1 rad of steering agle
-double END_SWITCH_OFSET = -1200; // the amount of steps from the end switch to the zero point
+double STEPS_PER_RAD = 1130 / 0.576; // the amount of steps the stepper needs for 1 rad of steering agle
+double END_SWITCH_OFSET = -1130; // the amount of steps from the end switch to the zero point
 double MPS_TO_RPM_FACTOR = 54.6; // Conversion factor for calculating the M/s to RPM
 
 const long interval = 20;  // interval at which to blink (milliseconds)
@@ -107,8 +107,8 @@ void setup() {
   sbus_rx.Begin();
 
   pinMode(ENDSTOP_PIN, INPUT_PULLUP);  // set up end switch for steering
-  stepper.setMaxSpeed(6200000);            // adjust as needed
-  stepper.setAcceleration(1200000);
+  stepper.setMaxSpeed(620000);
+  stepper.setAcceleration(120000);
 
   // Move toward the switch slowly until it's hit
   stepper.setSpeed(-300); // Move in reverse
@@ -131,6 +131,8 @@ void setup() {
 }
 
 void loop() {
+  stepper.run();
+
   if (sbus_rx.Read()) {
     Sbus_Rx_Data = sbus_rx.data();
     CAN_Enable = (Sbus_Rx_Data.ch[4] > 1000);
@@ -143,6 +145,8 @@ void loop() {
     SBUS_Speed = (Sbus_Rx_Data.ch[1] - 992.0) / 819.0 * 1.5;
   }
 
+  stepper.run();
+
   CANFrame frame_in;
   if (CAN.read(frame_in) == CANController::IOResult::OK) {
     switch (frame_in.getId()) {
@@ -151,7 +155,7 @@ void loop() {
         frame_in.getData(CAN_Bus_Data_In, sizeof(CAN_Bus_Data_In));
 
         CAN_Speed = (double)((int16_t)((CAN_Bus_Data_In[0] << 8) | CAN_Bus_Data_In[1])) / 1000.0;
-        CAN_Steering_Angle = (double)((int16_t)((CAN_Bus_Data_In[6] << 8) | CAN_Bus_Data_In[7])) / 1000.0;
+        CAN_Steering_Angle = (double)((int16_t)((CAN_Bus_Data_In[6] << 8) | CAN_Bus_Data_In[7])) / -1000.0;
 
         Serial.print("Steering angle = ");
         Serial.print(CAN_Steering_Angle, 3);
@@ -170,6 +174,8 @@ void loop() {
     }
 
   }
+
+  stepper.run();
 
   bool raw = digitalRead(EMERGENCY_STOP_PIN);
 
@@ -222,16 +228,6 @@ void loop() {
   stepper.moveTo(Set_Steering_Angle*STEPS_PER_RAD);
   stepper.run();
 
-  Serial.print(SBUS_Speed);
-  Serial.print(" - ");
-  Serial.print(Set_Speed);
-  Serial.print(" - ");
-  Serial.print(MPS_TO_RPM_FACTOR);
-  Serial.print(" - ");
-  Serial.println((1000 + (Set_Speed * MPS_TO_RPM_FACTOR * SBUS_Speed_Mode)));
-
-
-
   esc.writeMicroseconds(1000 + (Set_Speed * MPS_TO_RPM_FACTOR * SBUS_Speed_Mode));
 
   /* USE IF SPEED CONTROLER CONECTED VIA UART/SERIAL
@@ -244,7 +240,7 @@ void loop() {
   */
 
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval && false) {
+  if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
 
     uint8_t CAN_Bus_Data_Out[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
