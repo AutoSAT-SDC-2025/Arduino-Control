@@ -83,7 +83,7 @@ double STEPS_PER_RAD = 1695 / 0.576; // the amount of steps the stepper needs fo
 double END_SWITCH_OFSET = -1695; // the amount of steps from the end switch to the zero point
 double MPS_TO_RPM_FACTOR = 54.6; // Conversion factor for calculating the M/s to RPM
 
-const long interval = 20;  // interval at which to blink (milliseconds)
+const long interval = 20;  // interval at which to send back data on CAN-bus (milliseconds)
 unsigned long previousMillis = 0;
 
 void setup() {
@@ -116,7 +116,7 @@ void setup() {
     stepper.runSpeed();  // Move until switch is hit
   }
 
-  // Stop and set current position as ofset from zero
+  // Set current position as ofset from zero
   stepper.setCurrentPosition(END_SWITCH_OFSET);
 
   // test contection to CAN bus controler
@@ -150,20 +150,12 @@ void loop() {
   CANFrame frame_in;
   if (CAN.read(frame_in) == CANController::IOResult::OK) {
     switch (frame_in.getId()) {
-      case ID::CONTROLE_COMAND:
+      case ID::CONTROLE_COMAND: // receve steering and speed data
         uint8_t CAN_Bus_Data_In[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         frame_in.getData(CAN_Bus_Data_In, sizeof(CAN_Bus_Data_In));
 
         CAN_Speed = (double)((int16_t)((CAN_Bus_Data_In[0] << 8) | CAN_Bus_Data_In[1])) / 1000.0;
         CAN_Steering_Angle = (double)((int16_t)((CAN_Bus_Data_In[6] << 8) | CAN_Bus_Data_In[7])) / -1000.0;
-
-        Serial.print("Steering angle = ");
-        Serial.print(CAN_Steering_Angle, 3);
-        Serial.print("Rad   Speed = ");
-        Serial.print(CAN_Speed, 3);
-        Serial.println("m/s");
-
-        // code block
         break;
       case ID::CONTROLE_MODE_SETTING_COMAND:
         // code block
