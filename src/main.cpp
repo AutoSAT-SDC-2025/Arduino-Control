@@ -79,8 +79,8 @@ double Actual_Speed = 0; // the actual speed in m/s
 double Battery_Voltage = 0;
 double Curent_Draw_Drive_Motor = 0;
 
-double STEPS_PER_RAD = 1130 / 0.576; // the amount of steps the stepper needs for 1 rad of steering agle
-double END_SWITCH_OFSET = -1130; // the amount of steps from the end switch to the zero point
+double STEPS_PER_RAD = 1695 / 0.576; // the amount of steps the stepper needs for 1 rad of steering agle
+double END_SWITCH_OFSET = -1695; // the amount of steps from the end switch to the zero point
 double MPS_TO_RPM_FACTOR = 54.6; // Conversion factor for calculating the M/s to RPM
 
 const long interval = 20;  // interval at which to blink (milliseconds)
